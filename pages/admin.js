@@ -1,44 +1,25 @@
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
 
 export default function Admin() {
-  const router = useRouter()
   const [registrations, setRegistrations] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [authenticated, setAuthenticated] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [password, setPassword] = useState('')
+  const [storedPassword, setStoredPassword] = useState('')
 
   useEffect(() => {
-    checkAuth()
+    // nothing on mount; admin must enter password each time
   }, [])
 
-  async function checkAuth() {
-    try {
-      const res = await fetch('/api/registrations')
-      if (res.status === 401) {
-        setChecking(false)
-        router.push('/login')
-        return
-      }
-      if (res.ok) {
-        setAuthenticated(true)
-        setChecking(false)
-        fetchRegistrations()
-      }
-    } catch (err) {
-      setError('Auth check failed')
-      setChecking(false)
-    }
-  }
-
-  async function fetchRegistrations() {
+  async function fetchRegistrations(pwd) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/registrations')
+      const headerPwd = pwd || storedPassword
+      const res = await fetch('/api/registrations', { headers: { 'x-admin-password': headerPwd } })
       const json = await res.json()
       if (res.ok) {
         setRegistrations(json.data || [])
@@ -114,7 +95,7 @@ export default function Admin() {
     try {
       const res = await fetch(`/api/registration?id=${editingId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': storedPassword },
         body: JSON.stringify({
           fullName: editForm.fullName,
           sabha: editForm.sabha,
@@ -140,7 +121,7 @@ export default function Admin() {
     if (!confirm('Are you sure you want to delete this registration?')) return
 
     try {
-      const res = await fetch(`/api/registration?id=${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/registration?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': storedPassword } })
       if (res.ok) {
         fetchRegistrations()
       } else {
@@ -151,12 +132,48 @@ export default function Admin() {
     }
   }
 
+  async function handlePasswordSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      // try fetching registrations with the provided password
+      const res = await fetch('/api/registrations', { headers: { 'x-admin-password': password } })
+      if (res.ok) {
+        setStoredPassword(password)
+        setAuthenticated(true)
+        await fetchRegistrations(password)
+      } else {
+        const json = await res.json().catch(() => null)
+        setError(json?.error || 'Invalid password')
+      }
+    } catch (err) {
+      setError('Network error: ' + err.message)
+    } finally {
+      setLoading(false)
+      setPassword('')
+    }
+  }
+
   return (
     <div className="container">
       <h1>Admin — Anand Parv Registrations</h1>
 
-      {checking && <p>Checking authentication...</p>}
-      {!checking && !authenticated && <p>Not authenticated. Redirecting...</p>}
+      {!authenticated && (
+        <div style={{ maxWidth: 480 }}>
+          <p>Enter admin password to view registrations (required each time).</p>
+          <form onSubmit={handlePasswordSubmit}>
+            <div className="field">
+              <label>Admin password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={loading}>{loading ? 'Checking...' : 'Submit'}</button>
+            </div>
+          </form>
+          {error && <p style={{ color: 'red' }}>{error}</p>}
+        </div>
+      )}
 
       {authenticated && (
         <>

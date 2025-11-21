@@ -1,6 +1,5 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const { isAuthenticated } = require('../../lib/auth');
 
 const dbPath = path.join(process.cwd(), 'data', 'registrations.db');
 
@@ -18,7 +17,9 @@ function getAllRegistrations() {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!isAuthenticated(req)) {
+  const password = req.headers['x-admin-password'] || ''
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
+  if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

@@ -21,7 +21,16 @@ export default function Home(){
     const payload = { fullName, sabha, reference: sabha==='No'? reference: null, relation: sabha==='No'? relation: null, phone: sabha==='No'? phone: null }
     try{
       const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      const data = await res.json()
+      // parse response safely: some errors may return empty body
+      const text = await res.text()
+      let data = null
+      try{
+        data = text ? JSON.parse(text) : null
+      }catch(parseErr){
+        // non-JSON response
+        console.warn('Failed to parse JSON response:', parseErr)
+      }
+
       if(res.ok){
         setMessage('Registration saved. Thank you!')
         setFullName('')
@@ -30,7 +39,8 @@ export default function Home(){
         setRelation('')
         setPhone('')
       } else {
-        setMessage(data?.error || 'Failed to save')
+        const errMsg = data?.error || text || `Server error: ${res.status}`
+        setMessage(errMsg)
       }
     }catch(err){
       setMessage('Network error: '+err.message)

@@ -1,0 +1,5 @@
+const { dbPath } = require('../lib/db')
+const fs = require('fs')
+console.log('Database path:', dbPath)
+if (fs.existsSync(dbPath)) console.log('DB already exists')
+else console.log('DB created on first import of lib/db')
